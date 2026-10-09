@@ -1,0 +1,52 @@
+name: CI/CD Pipeline - Cidades ESG
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    name: Build e Testes Automatizados
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: Configurar SDK .NET 8
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar Dependências
+        run: dotnet restore src/CidadesESG.csproj
+
+      - name: Compilar Projeto (Build)
+        run: dotnet build src/CidadesESG.csproj --no-restore --configuration Release
+
+      - name: Teste de Build do Container Docker
+        run: docker build -t cidades-esg-api:latest .
+
+  deploy-staging:
+    name: Deploy em Staging
+    needs: build-and-test
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executar Deploy (Staging)
+        run: |
+          echo "Simulando deploy no ambiente de STAGING..."
+          echo "Ambiente de Staging atualizado com sucesso!"
+
+  deploy-production:
+    name: Deploy em Produção
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executar Deploy (Produção)
+        run: |
+          echo "Simulando deploy no ambiente de PRODUÇÃO..."
+          echo "Ambiente de Produção atualizado com sucesso!"
