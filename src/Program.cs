@@ -12,7 +12,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "API RESTful para monitorização, recolha e análise de indicadores ESG (Environmental, Social, Governance) no contexto de cidades inteligentes.",
         Contact = new OpenApiContact
         {
-            Name = "Equipa DevOps ESG",
+            Name = "Equipe DevOps ESG",
             Email = "suporte@cidades-esg.com"
         }
     });
@@ -68,19 +68,44 @@ app.MapGet("/api/esg/indicadores/{id:int}", (int id) =>
 })
 .WithTags("Indicadores ESG");
 
-// 4. Registar novo indicador ESG
+// 4. Registar novo indicador ESG (POST)
 app.MapPost("/api/esg/indicadores", (IndicadorESG novoIndicador) =>
 {
-    var id = indicadoresESG.Max(i => i.Id) + 1;
+    var id = indicadoresESG.Any() ? indicadoresESG.Max(i => i.Id) + 1 : 1;
     var indicadorComId = novoIndicador with { Id = id };
     indicadoresESG.Add(indicadorComId);
     return Results.Created($"/api/esg/indicadores/{id}", indicadorComId);
 })
 .WithTags("Indicadores ESG");
 
+// 5. Atualizar indicador existente (PUT)
+app.MapPut("/api/esg/indicadores/{id:int}", (int id, IndicadorESG indicadorAtualizado) =>
+{
+    var index = indicadoresESG.FindIndex(i => i.Id == id);
+    if (index == -1)
+        return Results.NotFound(new { mensagem = $"Indicador com ID {id} não foi encontrado para atualização." });
+
+    var item = indicadorAtualizado with { Id = id };
+    indicadoresESG[index] = item;
+    return Results.Ok(item);
+})
+.WithTags("Indicadores ESG");
+
+// 6. Remover indicador ESG (DELETE)
+app.MapDelete("/api/esg/indicadores/{id:int}", (int id) =>
+{
+    var indicador = indicadoresESG.FirstOrDefault(i => i.Id == id);
+    if (indicador is null)
+        return Results.NotFound(new { mensagem = $"Indicador com ID {id} não foi encontrado para remoção." });
+
+    indicadoresESG.Remove(indicador);
+    return Results.Ok(new { mensagem = $"Indicador com ID {id} foi removido com sucesso." });
+})
+.WithTags("Indicadores ESG");
+
 app.Run();
 
-// Registro de Dados para a API
+// Estrutura do objeto
 public record IndicadorESG(
     int Id,
     string Categoria,
