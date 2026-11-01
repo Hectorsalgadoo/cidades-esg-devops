@@ -1,95 +1,97 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 using Xunit;
+using Xunit.Abstractions;
 
 public class EsgApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient _client;
+    private readonly ITestOutputHelper _output;
 
-    public EsgApiIntegrationTests(WebApplicationFactory<Program> factory)
+    public EsgApiIntegrationTests(WebApplicationFactory<Program> factory, ITestOutputHelper output)
     {
         _client = factory.CreateClient();
+        _output = output;
     }
 
     [Fact]
+    [Trait("Categoria", "Caminho Feliz")]
     public async Task GetIndicadores_DeveRetornar2OkELista_QuandoCategoriaForAmbiental()
     {
-        // Act (Caminho Feliz - GET)
+        _output.WriteLine("[TESTE EXECUTADO]: Consulta de Indicadores ESG filtrados por Categoria (Ambiental) - Status Esperado: 200 OK");
+        
         var response = await _client.GetAsync("/api/esg/indicadores?categoria=Ambiental");
-
-        // Assert (Status Code)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Assert (Corpo da Resposta JSON)
         var content = await response.Content.ReadAsStringAsync();
         content.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
+    [Trait("Categoria", "Caminho Feliz")]
     public async Task PostIndicadores_DeveRetornar201Created_QuandoDadosForemValidos()
     {
-        // Arrange
+        _output.WriteLine("[TESTE EXECUTADO]: Registo de Novo Indicador ESG (POST) - Status Esperado: 201 Created");
+
         var novoIndicador = new
         {
-            titulo = "Redução de Emissões de Carbono",
             categoria = "Ambiental",
-            valor = 85.5,
-            meta = "90%"
+            nome = "Redução de Emissões de Carbono",
+            descricao = "Frota verde",
+            valorAtual = "85%",
+            meta = "90%",
+            status = "Em Progresso",
+            ultimaAtualizacao = "2026-Q3"
         };
 
-        // Act (Caminho Feliz - POST)
         var response = await _client.PostAsJsonAsync("/api/esg/indicadores", novoIndicador);
-
-        // Assert (Status Code 201 Created)
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("id");
+        content.Should().Contain("Id");
     }
 
     [Fact]
+    [Trait("Categoria", "Caminho Negativo")]
     public async Task GetIndicadoresPorId_DeveRetornar404_QuandoIdForInexistente()
     {
-        // Act (Caminho Negativo - ID Inexistente)
-        var response = await _client.GetAsync("/api/esg/indicadores/9999");
+        _output.WriteLine("[TESTE EXECUTADO]: Consulta por ID Inexistente (Cenário Negativo) - Status Esperado: 404 Not Found");
 
-        // Assert (Status Code 404 Not Found)
+        var response = await _client.GetAsync("/api/esg/indicadores/9999");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
+    [Trait("Categoria", "Contrato e Schema")]
     public async Task ValidarContratoJsonSchema_DoIndicadorESG()
     {
-        // Act
+        _output.WriteLine("[TESTE EXECUTADO]: Validação de Contrato JSON Schema da API de Indicadores ESG");
+
         var response = await _client.GetAsync("/api/esg/indicadores");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         
         var jsonString = await response.Content.ReadAsStringAsync();
         JToken jsonToken = JToken.Parse(jsonString);
 
-        // Arrange (Definição do Contrato JSON Schema exigido no requisito)
         string schemaJson = @"{
             'type': 'array',
             'items': {
                 'type': 'object',
                 'properties': {
-                    'id': {'type': ['integer', 'string']},
-                    'titulo': {'type': 'string'},
-                    'categoria': {'type': 'string'},
-                    'valor': {'type': 'number'}
+                    'Id': {'type': 'integer'},
+                    'Categoria': {'type': 'string'},
+                    'Nome': {'type': 'string'},
+                    'Meta': {'type': 'string'}
                 },
-                'required': ['id', 'categoria']
+                'required': ['Id', 'Categoria', 'Nome']
             }
         }";
 
         JSchema schema = JSchema.Parse(schemaJson);
-
-        // Assert (Validação de Contrato)
         bool isValid = jsonToken.IsValid(schema);
         isValid.Should().BeTrue("O contrato da API deve corresponder ao JSON Schema definido.");
     }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,24 +40,25 @@ var indicadoresESG = new List<IndicadorESG>
 };
 
 // 1. Health Check
-app.MapGet("/health", () => Results.Ok(new
-{
-    status = "Healthy",
-    service = "CidadesESG.API",
-    version = "1.0.0",
-    environment = Environment.GetEnvironmentVariable("ENVIRONMENT") ?? "Production",
-    timestamp = DateTime.UtcNow
-}))
+app.MapGet("/health", () => Results.Content(
+    JsonSerializer.Serialize(new
+    {
+        status = "Healthy",
+        service = "CidadesESG.API",
+        version = "1.0.0",
+        environment = Environment.GetEnvironmentVariable("ENVIRONMENT") ?? "Production",
+        timestamp = DateTime.UtcNow
+    }), "application/json"))
 .WithTags("Saúde do Sistema");
 
 // 2. Obter todos os indicadores (com filtro opcional de categoria)
 app.MapGet("/api/esg/indicadores", (string? categoria) =>
 {
     if (string.IsNullOrWhiteSpace(categoria))
-        return Results.Ok(indicadoresESG);
+        return Results.Content(JsonSerializer.Serialize(indicadoresESG), "application/json");
 
     var filtrados = indicadoresESG.Where(i => i.Categoria.Equals(categoria, StringComparison.OrdinalIgnoreCase)).ToList();
-    return Results.Ok(filtrados);
+    return Results.Content(JsonSerializer.Serialize(filtrados), "application/json");
 })
 .WithTags("Indicadores ESG");
 
@@ -64,7 +66,10 @@ app.MapGet("/api/esg/indicadores", (string? categoria) =>
 app.MapGet("/api/esg/indicadores/{id:int}", (int id) =>
 {
     var indicador = indicadoresESG.FirstOrDefault(i => i.Id == id);
-    return indicador is not null ? Results.Ok(indicador) : Results.NotFound(new { mensagem = $"Indicador com ID {id} não foi encontrado." });
+    if (indicador is null)
+        return Results.Content(JsonSerializer.Serialize(new { mensagem = $"Indicador com ID {id} não foi encontrado." }), "application/json", statusCode: 404);
+
+    return Results.Content(JsonSerializer.Serialize(indicador), "application/json");
 })
 .WithTags("Indicadores ESG");
 
@@ -74,7 +79,7 @@ app.MapPost("/api/esg/indicadores", (IndicadorESG novoIndicador) =>
     var id = indicadoresESG.Any() ? indicadoresESG.Max(i => i.Id) + 1 : 1;
     var indicadorComId = novoIndicador with { Id = id };
     indicadoresESG.Add(indicadorComId);
-    return Results.Created($"/api/esg/indicadores/{id}", indicadorComId);
+    return Results.Content(JsonSerializer.Serialize(indicadorComId), "application/json", statusCode: 201);
 })
 .WithTags("Indicadores ESG");
 
@@ -83,11 +88,11 @@ app.MapPut("/api/esg/indicadores/{id:int}", (int id, IndicadorESG indicadorAtual
 {
     var index = indicadoresESG.FindIndex(i => i.Id == id);
     if (index == -1)
-        return Results.NotFound(new { mensagem = $"Indicador com ID {id} não foi encontrado para atualização." });
+        return Results.Content(JsonSerializer.Serialize(new { mensagem = $"Indicador com ID {id} não foi encontrado para atualização." }), "application/json", statusCode: 404);
 
     var item = indicadorAtualizado with { Id = id };
     indicadoresESG[index] = item;
-    return Results.Ok(item);
+    return Results.Content(JsonSerializer.Serialize(item), "application/json");
 })
 .WithTags("Indicadores ESG");
 
@@ -96,10 +101,10 @@ app.MapDelete("/api/esg/indicadores/{id:int}", (int id) =>
 {
     var indicador = indicadoresESG.FirstOrDefault(i => i.Id == id);
     if (indicador is null)
-        return Results.NotFound(new { mensagem = $"Indicador com ID {id} não foi encontrado para remoção." });
+        return Results.Content(JsonSerializer.Serialize(new { mensagem = $"Indicador com ID {id} não foi encontrado para remoção." }), "application/json", statusCode: 404);
 
     indicadoresESG.Remove(indicador);
-    return Results.Ok(new { mensagem = $"Indicador com ID {id} foi removido com sucesso." });
+    return Results.Content(JsonSerializer.Serialize(new { mensagem = $"Indicador com ID {id} foi removido com sucesso." }), "application/json");
 })
 .WithTags("Indicadores ESG");
 
@@ -116,3 +121,5 @@ public record IndicadorESG(
     string Status,
     string UltimaAtualizacao
 );
+
+public partial class Program { }
